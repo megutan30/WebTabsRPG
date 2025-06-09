@@ -1,0 +1,730 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>マルチタブRPG</title>
+    <style>
+        body {
+            margin: 0;
+            font-family: 'Courier New', monospace;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            color: #fff;
+            overflow: hidden;
+            height: 100vh;
+        }
+
+        .game-container {
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .header {
+            background: rgba(0,0,0,0.8);
+            padding: 10px 20px;
+            border-bottom: 2px solid #4a90e2;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .character-info {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+
+        .character-name {
+            font-size: 24px;
+            font-weight: bold;
+        }
+
+        .warrior { color: #ff6b6b; }
+        .mage { color: #4ecdc4; }
+        .archer { color: #45b7d1; }
+
+        .hp-bar, .mp-bar {
+            width: 150px;
+            height: 20px;
+            background: #333;
+            border-radius: 10px;
+            overflow: hidden;
+            border: 2px solid #555;
+        }
+
+        .hp-fill { background: #ff4757; }
+        .mp-fill { background: #3742fa; }
+
+        .fill {
+            height: 100%;
+            transition: width 0.3s ease;
+        }
+
+        .party-status {
+            display: flex;
+            gap: 10px;
+            font-size: 12px;
+        }
+
+        .party-member {
+            padding: 5px 8px;
+            border-radius: 5px;
+            background: rgba(255,255,255,0.1);
+        }
+
+        .online { border-left: 3px solid #2ed573; }
+        .offline { border-left: 3px solid #ff4757; }
+
+        .game-world {
+            flex: 1;
+            display: flex;
+        }
+
+        .dungeon-map {
+            flex: 1;
+            position: relative;
+            background: 
+                radial-gradient(circle at 20% 30%, rgba(255,107,107,0.1) 0%, transparent 50%),
+                radial-gradient(circle at 80% 70%, rgba(78,205,196,0.1) 0%, transparent 50%),
+                radial-gradient(circle at 40% 80%, rgba(69,183,209,0.1) 0%, transparent 50%);
+        }
+
+        .dungeon-floor {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            background-image: 
+                repeating-linear-gradient(90deg, transparent, transparent 98px, rgba(255,255,255,0.03) 100px),
+                repeating-linear-gradient(180deg, transparent, transparent 98px, rgba(255,255,255,0.03) 100px);
+        }
+
+        .player {
+            position: absolute;
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 20px;
+            font-weight: bold;
+            box-shadow: 0 0 20px currentColor;
+            transition: all 0.3s ease;
+            cursor: pointer;
+        }
+
+        .player:hover {
+            transform: scale(1.2);
+        }
+
+        .monster {
+            position: absolute;
+            width: 35px;
+            height: 35px;
+            background: #ff4757;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 18px;
+            animation: float 2s ease-in-out infinite;
+            box-shadow: 0 0 15px #ff4757;
+        }
+
+        @keyframes float {
+            0%, 100% { transform: translateY(0px); }
+            50% { transform: translateY(-10px); }
+        }
+
+        .treasure {
+            position: absolute;
+            width: 30px;
+            height: 30px;
+            background: #ffd700;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 16px;
+            animation: spin 3s linear infinite;
+            box-shadow: 0 0 15px #ffd700;
+        }
+
+        @keyframes spin {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+
+        .controls {
+            background: rgba(0,0,0,0.9);
+            padding: 20px;
+            border-top: 2px solid #4a90e2;
+        }
+
+        .control-buttons {
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+            margin-bottom: 15px;
+        }
+
+        .btn {
+            padding: 10px 20px;
+            background: #4a90e2;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-family: inherit;
+            font-weight: bold;
+            transition: all 0.3s ease;
+        }
+
+        .btn:hover {
+            background: #357abd;
+            transform: translateY(-2px);
+        }
+
+        .btn:disabled {
+            background: #666;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .action-log {
+            height: 80px;
+            background: rgba(0,0,0,0.5);
+            border-radius: 5px;
+            padding: 10px;
+            overflow-y: auto;
+            font-size: 14px;
+            border: 1px solid #555;
+        }
+
+        .log-entry {
+            margin-bottom: 5px;
+            padding: 2px 0;
+        }
+
+        .log-warrior { color: #ff6b6b; }
+        .log-mage { color: #4ecdc4; }
+        .log-archer { color: #45b7d1; }
+        .log-system { color: #ffd700; }
+        .log-damage { color: #ff4757; }
+
+        .setup-screen {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.95);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+        }
+
+        .setup-content {
+            text-align: center;
+            max-width: 600px;
+            padding: 40px;
+            background: rgba(255,255,255,0.1);
+            border-radius: 15px;
+            border: 2px solid #4a90e2;
+        }
+
+        .setup-content h1 {
+            font-size: 32px;
+            margin-bottom: 20px;
+            color: #4a90e2;
+        }
+
+        .character-selection {
+            display: flex;
+            gap: 20px;
+            justify-content: center;
+            margin: 30px 0;
+        }
+
+        .character-card {
+            padding: 20px;
+            border: 2px solid transparent;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            background: rgba(255,255,255,0.05);
+        }
+
+        .character-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 25px rgba(0,0,0,0.3);
+        }
+
+        .character-card.selected {
+            border-color: #4a90e2;
+            background: rgba(74,144,226,0.2);
+        }
+
+        .tab-instructions {
+            background: rgba(255,193,7,0.2);
+            border: 1px solid #ffc107;
+            border-radius: 8px;
+            padding: 15px;
+            margin: 20px 0;
+        }
+
+        .hidden { display: none; }
+    </style>
+</head>
+<body>
+    <!-- セットアップ画面 -->
+    <div id="setupScreen" class="setup-screen">
+        <div class="setup-content">
+            <h1>🎮 マルチタブRPG</h1>
+            <p>このゲームは複数のタブを使って3人のパーティーでダンジョンを攻略します！</p>
+            
+            <div class="tab-instructions">
+                <h3>📋 遊び方</h3>
+                <p>1. 下から1つのキャラクターを選んでください</p>
+                <p>2. 「開始」ボタンを押すと、このタブがそのキャラクターになります</p>
+                <p>3. <strong>右クリック→「リンクを新しいタブで開く」または Ctrl+クリック</strong> でこのページを新しいタブで2回開いてください</p>
+                <p>4. 新しいタブで別のキャラクターを選んでください</p>
+                <p>5. 合計3つのタブで3人のパーティーを結成しましょう！</p>
+                <p>6. タブを切り替えながら、それぞれのキャラクターを操作してダンジョンを攻略！</p>
+                <p><strong>⚠️ 注意: 同じキャラクターは複数のタブで選択できません</strong></p>
+            </div>
+
+            <div class="character-selection">
+                <div class="character-card warrior" data-character="warrior">
+                    <h3>⚔️ 戦士</h3>
+                    <p>高いHPと攻撃力</p>
+                    <p>近接攻撃が得意</p>
+                </div>
+                <div class="character-card mage" data-character="mage">
+                    <h3>🔮 魔法使い</h3>
+                    <p>強力な魔法攻撃</p>
+                    <p>範囲攻撃が可能</p>
+                </div>
+                <div class="character-card archer" data-character="archer">
+                    <h3>🏹 弓使い</h3>
+                    <p>素早い連続攻撃</p>
+                    <p>遠距離攻撃が得意</p>
+                </div>
+            </div>
+
+            <button id="startGame" class="btn" disabled>キャラクターを選んでください</button>
+        </div>
+    </div>
+
+    <!-- ゲーム画面 -->
+    <div id="gameScreen" class="game-container hidden">
+        <div class="header">
+            <div class="character-info">
+                <div id="characterName" class="character-name"></div>
+                <div>
+                    <div style="font-size: 12px; margin-bottom: 3px;">HP</div>
+                    <div class="hp-bar">
+                        <div id="hpFill" class="fill hp-fill" style="width: 100%"></div>
+                    </div>
+                </div>
+                <div>
+                    <div style="font-size: 12px; margin-bottom: 3px;">MP</div>
+                    <div class="mp-bar">
+                        <div id="mpFill" class="fill mp-fill" style="width: 100%"></div>
+                    </div>
+                </div>
+            </div>
+            <div class="party-status">
+                <div id="partyWarrior" class="party-member offline">⚔️ 戦士</div>
+                <div id="partyMage" class="party-member offline">🔮 魔法使い</div>
+                <div id="partyArcher" class="party-member offline">🏹 弓使い</div>
+            </div>
+        </div>
+
+        <div class="game-world">
+            <div id="dungeonMap" class="dungeon-map">
+                <div class="dungeon-floor"></div>
+            </div>
+        </div>
+
+        <div class="controls">
+            <div class="control-buttons">
+                <button id="moveBtn" class="btn">移動</button>
+                <button id="attackBtn" class="btn">攻撃</button>
+                <button id="skillBtn" class="btn">スキル</button>
+                <button id="restBtn" class="btn">休憩</button>
+            </div>
+            <div id="actionLog" class="action-log">
+                <div class="log-entry log-system">🎮 ゲーム開始！タブを切り替えて他のキャラクターも操作しましょう</div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // グローバルな状態管理（メモリ内でタブ間共有をシミュレート）
+        if (!window.multiTabRPG) {
+            window.multiTabRPG = {
+                gameState: null,
+                tabs: [],
+                updateCallbacks: []
+            };
+        }
+        
+        // キャラクター設定
+        const characters = {
+            warrior: { name: '⚔️ 戦士', class: 'warrior', hp: 100, maxHp: 100, mp: 30, maxMp: 30, x: 100, y: 100 },
+            mage: { name: '🔮 魔法使い', class: 'mage', hp: 70, maxHp: 70, mp: 80, maxMp: 80, x: 150, y: 150 },
+            archer: { name: '🏹 弓使い', class: 'archer', hp: 85, maxHp: 85, mp: 50, maxMp: 50, x: 200, y: 120 }
+        };
+
+        // ダンジョン要素
+        const monsters = [
+            { id: 1, x: 300, y: 200, hp: 30, emoji: '👹' },
+            { id: 2, x: 500, y: 300, hp: 25, emoji: '🦇' },
+            { id: 3, x: 400, y: 150, hp: 40, emoji: '🐺' }
+        ];
+
+        const treasures = [
+            { id: 1, x: 600, y: 100, emoji: '💰' },
+            { id: 2, x: 450, y: 400, emoji: '🏺' },
+            { id: 3, x: 300, y: 350, emoji: '💎' }
+        ];
+
+        let currentPlayer = null;
+        let gameState = null;
+        let tabId = `tab_${Date.now()}_${Math.random()}`;
+
+        // 初期化
+        function initGame() {
+            setupEventListeners();
+            
+            // このタブをグローバルリストに追加
+            window.multiTabRPG.tabs.push(tabId);
+            
+            // 更新コールバック登録
+            window.multiTabRPG.updateCallbacks.push(updateFromGlobalState);
+            
+            loadGameState();
+        }
+
+        function setupEventListeners() {
+            // キャラクター選択
+            document.querySelectorAll('.character-card').forEach(card => {
+                card.addEventListener('click', () => {
+                    document.querySelectorAll('.character-card').forEach(c => c.classList.remove('selected'));
+                    card.classList.add('selected');
+                    document.getElementById('startGame').disabled = false;
+                    document.getElementById('startGame').textContent = `${card.querySelector('h3').textContent} として開始`;
+                });
+            });
+
+            // ゲーム開始
+            document.getElementById('startGame').addEventListener('click', startGame);
+
+            // ゲーム操作
+            document.getElementById('moveBtn').addEventListener('click', () => performAction('move'));
+            document.getElementById('attackBtn').addEventListener('click', () => performAction('attack'));
+            document.getElementById('skillBtn').addEventListener('click', () => performAction('skill'));
+            document.getElementById('restBtn').addEventListener('click', () => performAction('rest'));
+        }
+
+        function startGame() {
+            const selectedCard = document.querySelector('.character-card.selected');
+            const characterType = selectedCard.dataset.character;
+            
+            currentPlayer = characterType;
+
+            // ゲーム状態初期化または読み込み
+            if (!window.multiTabRPG.gameState) {
+                window.multiTabRPG.gameState = {
+                    players: { ...characters },
+                    monsters: [...monsters],
+                    treasures: [...treasures],
+                    activeConnections: [],
+                    gameLog: [],
+                    tabPlayers: {}
+                };
+            }
+            
+            gameState = window.multiTabRPG.gameState;
+
+            // このタブのプレイヤーをアクティブに
+            gameState.tabPlayers[tabId] = currentPlayer;
+            if (!gameState.activeConnections.includes(currentPlayer)) {
+                gameState.activeConnections.push(currentPlayer);
+            }
+
+            // ページタイトル更新
+            document.title = `${characters[currentPlayer].name} - マルチタブRPG`;
+
+            saveGameState();
+            
+            document.getElementById('setupScreen').classList.add('hidden');
+            document.getElementById('gameScreen').classList.remove('hidden');
+            
+            updateDisplay();
+            addLogEntry('system', `${characters[currentPlayer].name} がパーティーに参加しました！`);
+            
+            // 他のタブに更新を通知
+            notifyOtherTabs();
+        }
+
+        function loadGameState() {
+            gameState = window.multiTabRPG.gameState;
+        }
+
+        function saveGameState() {
+            window.multiTabRPG.gameState = gameState;
+        }
+        
+        function notifyOtherTabs() {
+            // 他のタブの更新コールバックを呼び出し
+            window.multiTabRPG.updateCallbacks.forEach(callback => {
+                if (callback !== updateFromGlobalState) {
+                    try {
+                        callback();
+                    } catch(e) {
+                        // タブが閉じられている場合のエラーを無視
+                    }
+                }
+            });
+        }
+        
+        function updateFromGlobalState() {
+            if (currentPlayer && gameState) {
+                updateDisplay();
+            }
+        }
+
+        function updateDisplay() {
+            if (!currentPlayer || !gameState) return;
+
+            const player = gameState.players[currentPlayer];
+            
+            // キャラクター情報更新
+            document.getElementById('characterName').textContent = player.name;
+            document.getElementById('characterName').className = `character-name ${player.class}`;
+            
+            // HP/MP バー更新
+            const hpPercent = (player.hp / player.maxHp) * 100;
+            const mpPercent = (player.mp / player.maxMp) * 100;
+            document.getElementById('hpFill').style.width = `${hpPercent}%`;
+            document.getElementById('mpFill').style.width = `${mpPercent}%`;
+
+            // パーティー状態更新
+            ['warrior', 'mage', 'archer'].forEach(type => {
+                const element = document.getElementById(`party${type.charAt(0).toUpperCase() + type.slice(1)}`);
+                if (gameState.activeConnections.includes(type)) {
+                    element.classList.remove('offline');
+                    element.classList.add('online');
+                } else {
+                    element.classList.remove('online');
+                    element.classList.add('offline');
+                }
+            });
+
+            // ダンジョンマップ更新
+            updateDungeonMap();
+        }
+
+        function updateDungeonMap() {
+            const map = document.getElementById('dungeonMap');
+            map.innerHTML = '<div class="dungeon-floor"></div>';
+
+            // プレイヤー表示
+            Object.entries(gameState.players).forEach(([type, player]) => {
+                if (gameState.activeConnections.includes(type)) {
+                    const playerEl = document.createElement('div');
+                    playerEl.className = `player ${type}`;
+                    playerEl.style.left = `${player.x}px`;
+                    playerEl.style.top = `${player.y}px`;
+                    playerEl.style.color = type === 'warrior' ? '#ff6b6b' : type === 'mage' ? '#4ecdc4' : '#45b7d1';
+                    playerEl.textContent = player.name.split(' ')[0];
+                    
+                    if (type === currentPlayer) {
+                        playerEl.style.boxShadow = '0 0 30px currentColor';
+                        playerEl.style.transform = 'scale(1.1)';
+                    }
+                    
+                    map.appendChild(playerEl);
+                }
+            });
+
+            // モンスター表示
+            gameState.monsters.forEach(monster => {
+                if (monster.hp > 0) {
+                    const monsterEl = document.createElement('div');
+                    monsterEl.className = 'monster';
+                    monsterEl.style.left = `${monster.x}px`;
+                    monsterEl.style.top = `${monster.y}px`;
+                    monsterEl.textContent = monster.emoji;
+                    map.appendChild(monsterEl);
+                }
+            });
+
+            // 宝箱表示
+            gameState.treasures.forEach(treasure => {
+                const treasureEl = document.createElement('div');
+                treasureEl.className = 'treasure';
+                treasureEl.style.left = `${treasure.x}px`;
+                treasureEl.style.top = `${treasure.y}px`;
+                treasureEl.textContent = treasure.emoji;
+                map.appendChild(treasureEl);
+            });
+        }
+
+        function performAction(action) {
+            if (!currentPlayer || !gameState) return;
+
+            const player = gameState.players[currentPlayer];
+            
+            switch(action) {
+                case 'move':
+                    movePlayer();
+                    break;
+                case 'attack':
+                    attackMonster();
+                    break;
+                case 'skill':
+                    useSkill();
+                    break;
+                case 'rest':
+                    restPlayer();
+                    break;
+            }
+            
+            saveGameState();
+            updateDisplay();
+            notifyOtherTabs();
+        }
+
+        function movePlayer() {
+            const player = gameState.players[currentPlayer];
+            const newX = Math.max(50, Math.min(650, player.x + (Math.random() - 0.5) * 100));
+            const newY = Math.max(50, Math.min(350, player.y + (Math.random() - 0.5) * 100));
+            
+            player.x = newX;
+            player.y = newY;
+            
+            addLogEntry(currentPlayer, `${player.name} が移動しました`);
+        }
+
+        function attackMonster() {
+            const player = gameState.players[currentPlayer];
+            const nearbyMonster = gameState.monsters.find(m => 
+                m.hp > 0 && 
+                Math.abs(m.x - player.x) < 100 && 
+                Math.abs(m.y - player.y) < 100
+            );
+
+            if (nearbyMonster) {
+                const damage = Math.floor(Math.random() * 20) + 15;
+                nearbyMonster.hp -= damage;
+                
+                if (nearbyMonster.hp <= 0) {
+                    addLogEntry('damage', `${player.name} が ${nearbyMonster.emoji} を倒しました！`);
+                } else {
+                    addLogEntry('damage', `${player.name} が ${nearbyMonster.emoji} に ${damage} のダメージ！`);
+                }
+            } else {
+                addLogEntry(currentPlayer, `${player.name} の攻撃は空振りしました`);
+            }
+        }
+
+        function useSkill() {
+            const player = gameState.players[currentPlayer];
+            if (player.mp < 20) {
+                addLogEntry(currentPlayer, `${player.name} のMPが足りません`);
+                return;
+            }
+
+            player.mp -= 20;
+            
+            switch(currentPlayer) {
+                case 'warrior':
+                    addLogEntry('warrior', '⚔️ 戦士が剣技「連続斬り」を発動！');
+                    break;
+                case 'mage':
+                    addLogEntry('mage', '🔮 魔法使いが呪文「ファイアボール」を詠唱！');
+                    break;
+                case 'archer':
+                    addLogEntry('archer', '🏹 弓使いが技「連射」を放った！');
+                    break;
+            }
+        }
+
+        function restPlayer() {
+            const player = gameState.players[currentPlayer];
+            const hpRecover = Math.min(20, player.maxHp - player.hp);
+            const mpRecover = Math.min(15, player.maxMp - player.mp);
+            
+            player.hp += hpRecover;
+            player.mp += mpRecover;
+            
+            addLogEntry(currentPlayer, `${player.name} が休憩してHP・MPを回復しました`);
+        }
+
+        function addLogEntry(type, message) {
+            if (!gameState.gameLog) gameState.gameLog = [];
+            
+            gameState.gameLog.push({
+                type: type,
+                message: message,
+                timestamp: Date.now()
+            });
+
+            // ログが多すぎる場合は古いものを削除
+            if (gameState.gameLog.length > 20) {
+                gameState.gameLog = gameState.gameLog.slice(-20);
+            }
+
+            updateActionLog();
+        }
+
+        function updateActionLog() {
+            const logContainer = document.getElementById('actionLog');
+            logContainer.innerHTML = '';
+            
+            gameState.gameLog.slice(-5).forEach(entry => {
+                const logEl = document.createElement('div');
+                logEl.className = `log-entry log-${entry.type}`;
+                logEl.textContent = entry.message;
+                logContainer.appendChild(logEl);
+            });
+            
+            logContainer.scrollTop = logContainer.scrollHeight;
+        }
+
+        // このタブが閉じられる時の処理
+        window.addEventListener('beforeunload', () => {
+            if (currentPlayer && gameState) {
+                // アクティブ接続から削除
+                gameState.activeConnections = gameState.activeConnections.filter(p => p !== currentPlayer);
+                delete gameState.tabPlayers[tabId];
+                
+                // タブリストから削除
+                window.multiTabRPG.tabs = window.multiTabRPG.tabs.filter(id => id !== tabId);
+                
+                saveGameState();
+                notifyOtherTabs();
+            }
+        });
+
+        // 自動更新（他のタブの変更を検知するため）
+        setInterval(() => {
+            if (currentPlayer && gameState && window.multiTabRPG.gameState) {
+                const globalState = window.multiTabRPG.gameState;
+                if (JSON.stringify(gameState) !== JSON.stringify(globalState)) {
+                    gameState = globalState;
+                    updateDisplay();
+                }
+            }
+        }, 1000);
+
+        // ゲーム初期化
+        initGame();
+    </script>
+</body>
+</html>
